@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokemon Battle & Catch Simulator</title>
+    <style>
+        :root {
+            --poke-red: #ee1515;
+            --poke-white: #f0f0f0;
+            --poke-dark: #222222;
+            --poke-blue: #2a75bb;
+            --poke-gold: #ffcb05;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #c0c0c0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        #app-container {
+            width: 95%;
+            max-width: 700px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            overflow: hidden;
+            border: 8px solid var(--poke-dark);
+        }
+
+        /* Top Bar Info */
+        .top-info {
+            background: var(--poke-red);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 4px solid var(--poke-dark);
+            font-weight: bold;
+        }
+
+        /* Battle Screen */
+        #battle-screen {
+            height: 350px;
+            background: linear-gradient(to bottom, #78C850 0%, #E0E0E0 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pokemon-slot {
+            position: absolute;
+            width: 200px;
+            text-align: center;
+        }
+
+        #enemy-slot { top: 40px; left: 50px; }
+        #player-slot { bottom: 40px; right: 50px; }
+
+        .pokemon-img {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+            transition: transform 0.2s;
+        }
+
+        /* Health & EXP Bars */
+        .status-box {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid var(--poke-dark);
+            border-radius: 5px;
+            padding: 8px;
+            text-align: left;
+            margin-bottom: 5px;
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+        }
+
+        .bar-label { font-size: 12px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; }
+        
+        .bar-container {
+            width: 100%;
+            height: 10px;
+            background: #ccc;
+            border: 1px solid #333;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .hp-fill { height: 100%; width: 100%; background: #4caf50; transition: width 0.4s; }
+        .exp-fill { height: 100%; width: 0%; background: var(--poke-blue); transition: width 0.4s; }
+
+        /* Controls */
+        #controls {
+            padding: 20px;
+            background: var(--poke-white);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            border-top: 4px solid var(--poke-dark);
+        }
+
+        .log-box {
+            grid-column: span 2;
+            height: 50px;
+            background: #fff;
+            border: 2px solid #ddd;
+            padding: 10px;
+            font-size: 14px;
+            overflow-y: auto;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .btn {
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid var(--poke-dark);
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-red { background: var(--poke-red); color: white; }
+        .btn-white { background: white; color: var(--poke-dark); }
+        .btn-blue { background: var(--poke-blue); color: white; }
+        .btn-gold { background: var(--poke-gold); color: var(--poke-dark); }
+
+        /* Ball Selection UI */
+        .ball-selector {
+            grid-column: span 2;
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .ball-btn {
+            flex: 1;
+            font-size: 11px;
+            padding: 5px;
+            border: 2px solid #999;
+            background: #eee;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .ball-btn.active {
+            border-color: var(--poke-red);
+            background: #ffebeb;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        .shake { animation: shake 0.3s; }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+        }
+        .catch-anim { animation: bounce 0.6s infinite; }
+        
+        .faint { opacity: 0; transform: translateY(20px); transition: 0.5s; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div class="top-info">
+        <div>💰 $<span id="player-money">0</span></div>
+        <div>🎒 <span id="collection-count">1</span> / 10</div>
+        <div>LV <span id="player-lvl">5</span></div>
+    </div>
+
+    <div id="battle-screen">
+        <!-- Enemy -->
+        <div class="pokemon-slot" id="enemy-slot">
+            <div class="status-box">
+                <div class="bar-label"><span id="enemy-name">Wild Bulbasaur</span> (Lv.<span id="enemy-lvl">5</span>)</div>
+                <div class="bar-container"><div id="enemy-hp-fill" class="hp-fill"></div></div>
+            </div>
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png" class="pokemon-img" id="enemy-img">
+        </div>
+
+        <!-- Player -->
+        <div class="pokemon-slot" id="player-slot">
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" class="pokemon-img" id="player-img">
+            <div class="status-box">
+                <div class="bar-label">PIKACHU</div>
+                <div class="bar-container"><div id="player-hp-fill" class="hp-fill"></div></div>
+                <div class="bar-label" style="margin-top:5px; font-size:10px;">EXP</div>
+                <div class="bar-container" style="height:5px;"><div id="player-exp-fill" class="exp-fill"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div id="message-log" class="log-box">Seekor Bulbasaur liar muncul!</div>
+        
+        <button class="btn btn-red" onclick="action('attack')" id="atk-btn">Attack</button>
+        <button class="btn btn-white" onclick="action('heal')" id="heal-btn">Heal</button>
+        
+        <div class="ball-selector">
+            <button class="ball-btn active" id="ball-1" onclick="selectBall(1)">Poké Ball (∞)</button>
+            <button class="ball-btn" id="ball-2" onclick="selectBall(2)">Great Ball ($200)</button>
+            <button class="ball-btn" id="ball-3" onclick="selectBall(3)">Ultra Ball ($500)</button>
+        </div>
+        
+        <button class="btn btn-blue" onclick="action('catch')" style="grid-column: span 2;" id="catch-btn">Throw Pokéball</button>
+        
+        <button class="btn btn-gold" onclick="nextEnemy()" id="next-btn" style="display:none; grid-column: span 2;">Cari Lawan Berikutnya</button>
+    </div>
+</div>
+
+<script>
+    const wildPokemon = [
+        { name: "Bulbasaur", id: 1, maxHp: 60, lvl: 5 },
+        { name: "Charmander", id: 4, maxHp: 55, lvl: 6 },
+        { name: "Squirtle", id: 7, maxHp: 65, lvl: 5 },
+        { name: "Caterpie", id: 10, maxHp: 40, lvl: 3 },
+        { name: "Pidgey", id: 16, maxHp: 45, lvl: 4 },
+        { name: "Meowth", id: 52, maxHp: 50, lvl: 7 },
+        { name: "Psyduck", id: 54, maxHp: 70, lvl: 8 }
+    ];
+
+    const state = {
+        player: { 
+            hp: 100, 
+            maxHp: 100, 
+            exp: 0, 
+            lvl: 5, 
+            money: 0,
+            collection: ["Pikachu"],
+            selectedBall: 1 // 1: Poke, 2: Great, 3: Ultra
+        },
+        enemy: { ...wildPokemon[0], hp: 60 },
+        busy: false,
+        gameOver: false
+    };
+
+    function addLog(msg) {
+        const log = document.getElementById('message-log');
+        log.innerHTML = msg;
+    }
+
+    function selectBall(num) {
+        if (state.busy || state.gameOver) return;
+        state.player.selectedBall = num;
+        document.querySelectorAll('.ball-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`ball-${num}`).classList.add('active');
+        
+        const names = ["Poké Ball", "Great Ball", "Ultra Ball"];
+        addLog(`Siap melempar ${names[num-1]}!`);
+    }
+
+    function updateUI() {
+        // HP Player & Enemy
+        document.getElementById('player-hp-fill').style.width = (state.player.hp / state.player.maxHp * 100) + "%";
+        document.getElementById('enemy-hp-fill').style.width = (state.enemy.hp / state.enemy.maxHp * 100) + "%";
+        
+        // EXP & Money
+        document.getElementById('player-exp-fill').style.width = state.player.exp + "%";
+        document.getElementById('player-money').innerText = state.player.money;
+        
+        // Labels
+        document.getElementById('player-lvl').innerText = state.player.lvl;
+        document.getElementById('enemy-lvl').innerText = state.enemy.lvl;
+        document.getElementById('enemy-name').innerText = "Wild " + state.enemy.name;
+        document.getElementById('collection-count').innerText = state.player.collection.length;
+        
+        // Enemy Image
+        document.getElementById('enemy-img').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${state.enemy.id}.png`;
+    }
+
+    async function action(type) {
+        if (state.busy || state.gameOver) return;
+        state.busy = true;
+
+        if (type === 'attack') {
+            const dmg = 12 + Math.floor(Math.random() * 8) + (state.player.lvl * 2);
+            state.enemy.hp = Math.max(0, state.enemy.hp - dmg); // Kurangi HP musuh
+            
+            addLog(`Pikachu menyerang! ${state.enemy.name} kehilangan ${dmg} HP.`);
+            animate('enemy-img', 'shake');
+            updateUI();
+            
+            if (state.enemy.hp <= 0) {
+                await winBattle();
+                return;
+            }
+        } 
+        else if (type === 'heal') {
+            const healAmt = 40;
+            state.player.hp = Math.min(state.player.maxHp, state.player.hp + healAmt);
+            addLog(`Pikachu memulihkan ${healAmt} HP!`);
+            updateUI();
+        }
+        else if (type === 'catch') {
+            const ballCost = [0, 200, 500][state.player.selectedBall - 1];
+            const ballName = ["Poké Ball", "Great Ball", "Ultra Ball"][state.player.selectedBall - 1];
+            const ballBonus = [10, 25, 45][state.player.selectedBall - 1];
+
+            if (state.player.money < ballCost) {
+                addLog(`Uang tidak cukup untuk membeli ${ballName}!`);
+                state.busy = false;
+                return;
+            }
+
+            state.player.money -= ballCost;
+            addLog(`Kamu membeli & melempar ${ballName}...`);
+            animate('enemy-img', 'catch-anim');
+            updateUI();
+            await sleep(1500);
+            
+            // Logika Catch: HP Rendah + Bonus Ball
+            const hpFactor = (1 - (state.enemy.hp / state.enemy.maxHp)) * 50; // Max 50% dari HP rendah
+            const chance = hpFactor + ballBonus;
+            
+            if (Math.random() * 100 < chance) {
+                addLog(`Gotcha! ${state.enemy.name} berhasil ditangkap!`);
+                if (!state.player.collection.includes(state.enemy.name)) {
+                    state.player.collection.push(state.enemy.name);
+                }
+                document.getElementById('enemy-img').classList.add('faint');
+                await winBattle(true);
+                return;
+            } else {
+                addLog(`Oh tidak! ${state.enemy.name} kabur dari bola!`);
+                document.getElementById('enemy-img').classList.remove('catch-anim');
+            }
+        }
+
+        await sleep(1000);
+        await enemyTurn();
+    }
+
+    async function enemyTurn() {
+        if (state.gameOver) return;
+        const dmg = 5 + Math.floor(Math.random() * 10) + state.enemy.lvl;
+        state.player.hp = Math.max(0, state.player.hp - dmg);
+        
+        addLog(`${state.enemy.name} liar menyerang! Kamu kena ${dmg} DMG.`);
+        animate('player-img', 'shake');
+        updateUI();
+
+        if (state.player.hp <= 0) {
+            addLog(`Pikachu pingsan! Cari musuh lain untuk reset HP.`);
+            state.gameOver = true;
+            document.getElementById('next-btn').style.display = 'block';
+        }
+        state.busy = false;
+    }
+
+    async function winBattle(isCaught = false) {
+        const expGained = isCaught ? 50 : 30;
+        const moneyGained = 100 + (state.enemy.lvl * 20);
+        
+        state.player.exp += expGained;
+        state.player.money += moneyGained;
+        
+        addLog(`Menang! +${expGained} EXP & +$${moneyGained}.`);
+        
+        if (state.player.exp >= 100) {
+            state.player.lvl++;
+            state.player.exp = 0;
+            state.player.maxHp += 10;
+            state.player.hp = state.player.maxHp;
+            addLog(`Level Up! Pikachu kini Lv.${state.player.lvl}! HP Pulih.`);
+        }
+
+        document.getElementById('next-btn').style.display = 'block';
+        state.gameOver = true;
+        updateUI();
+    }
+
+    function nextEnemy() {
+        const rand = Math.floor(Math.random() * wildPokemon.length);
+        const base = wildPokemon[rand];
+        state.enemy = { ...base, hp: base.maxHp };
+        
+        // Reset state battle
+        state.gameOver = false;
+        state.busy = false;
+        state.player.hp = Math.max(state.player.hp, 20); // Beri HP sedikit jika pingsan sebelumnya
+        
+        document.getElementById('next-btn').style.display = 'none';
+        const eImg = document.getElementById('enemy-img');
+        eImg.classList.remove('faint', 'catch-anim');
+        eImg.style.display = 'block';
+        
+        addLog(`Seekor ${state.enemy.name} liar (Lv.${state.enemy.lvl}) muncul!`);
+        updateUI();
+    }
+
+    function animate(id, cls) {
+        const el = document.getElementById(id);
+        el.classList.add(cls);
+        setTimeout(() => el.classList.remove(cls), 500);
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Mulai UI
+    updateUI();
+</script>
+</body>
+</html>
